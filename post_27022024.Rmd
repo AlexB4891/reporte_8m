@@ -161,8 +161,8 @@ resumen_2 <- encuesta %>%
 ### El gráfico del tema:
 
 ```{r}
-plot_resultado <- enemdu_apilada %>% 
-  ggplot(aes(x = jornadas,y = indicador))  +
+plot_resultado <- resumen_1 %>% 
+  ggplot(aes(x = ingresos_medios,y = anio))  +
   # Lolipop plot:
   geom_segment(mapping = aes(x = jornadas,xend = jornadas,y = 0,yend = indicador), color="grey") +
   geom_point(aes(color=region),size=4) +
