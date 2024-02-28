@@ -1,0 +1,220 @@
+---
+title: "Indicadores para el mes de marzo, 8M"
+author: "Alex Bajaña"
+date: "27022024"
+output: html_document
+---
+  
+  
+# Cargamos librerias:
+  
+```{r, message=FALSE,warning=FALSE}
+
+library(tidyverse)
+library(scales)
+library(pins)
+library(haven)
+library(here)
+library(srvyr)
+library(survey)
+
+```
+
+# Con que versión de R trabajamos
+
+```{r}
+R.version
+```
+
+
+# Directorio (bases crudas)
+
+
+# Descarga y lectura de las bases de datos:
+
+```{r}
+path_temporal <- "C:/Users/alex_ergostats/OneDrive/Documentos/RAR/"
+
+carpeta <- board_folder(path = path_temporal)
+
+
+enemdus <- list.files(str_c(path_temporal,"enemdu_raw/"),full.names = T,pattern = "persona|15") %>% 
+  map(read_sav)
+
+
+enemdus <- enemdus %>% 
+  set_names(nm = as.character(2018:2023)) 
+
+
+
+
+# Check de la base de datos
+enemdu_apilada %>% 
+  group_by(anio) %>% 
+  summarise(ing_sample_mean = mean(ingresos,na.rm = T),
+            ing_sample_median = median(ingresos,na.rm = T) ,
+            population_valid = sum((!is.na(ingresos))*fexp),
+            population_ing_sd = sd(ingresos*fexp,na.rm = T) ) 
+
+```
+
+
+```{r}
+
+enemdu_apilada <- enemdus %>% 
+  map(select,
+      id_persona,
+      fexp,
+      sexo = p02,
+      edad = p03,
+      horas_trabajo = p24,
+      area,
+      ingresos = p66, 
+      otras_act = p21,
+      condact, ingrl,estrato,secemp ) %>% 
+  map(mutate, across(c(sexo,area,otras_act,secemp,condact),as_factor)) %>% 
+  imap(~.x %>% mutate(anio = .y)) %>% 
+  reduce(bind_rows) %>% 
+  mutate(edad = if_else(edad == 99,NA_real_,edad),
+         horas_trabajo = if_else(horas_trabajo == 999,NA_real_,horas_trabajo),
+         ingrl = if_else(ingrl == 999999,NA_real_,ingrl)) 
+
+```
+
+# Moficamos las bases de datos:
+
+Considerando las siguientes variables del RAS:
+  
+  
+* **id_persona:**
+* **fexp:**
+* **sexo:**
+* **edad:**
+* **horas_trabajo:**
+* **area:**
+* **ingresos:**
+* **otras_act:**
+  
+
+
+
+```{r}
+
+# Check de la base
+
+enemdu_apilada %>% 
+  group_by(anio) %>% 
+  summarise(ing_sample_mean = mean(ingresos,na.rm = T),
+            ing_sample_median = median(ingresos,na.rm = T) ,
+            population_valid = sum((!is.na(ingresos))*fexp),
+            population_ing_sd = sd(ingresos*fexp,na.rm = T) ) 
+
+
+```
+
+### Filtro para personas entre 18 y 65 años
+
+```{r}
+enemdu_apilada <- enemdu_apilada %>% 
+  filter(between(edad,18,65))
+```
+
+## Implementación del diseño muestral
+
+```{r}
+encuesta <- as_survey_design(.data = enemdu_apilada,ids = "id_persona",probs = "fexp",strata = "estrato")
+```
+
+
+## Generación de tablas de resumen: 
+
+### Ingresos promedio en condición de empleo adecuado
+#### Diferencia entre hombres mujeres, por año y región
+
+```{r}
+
+resumen_1 <- encuesta %>% 
+  filter(condact == "Empleo Adecuado/Pleno") %>% # Empleo pleno y adecuado
+  group_by(sexo,area,anio) %>% 
+  summarise(ingresos_medios = survey_mean(ingrl),
+            personas = survey_total(!is.na(ingrl)))
+```
+
+### Porcentaje de la población que aparte de trabajar 40 horas o más, realizan actividades adicionales para aportar al hogar
+#### Porcentaje en el area y por año y grupos de edad
+
+
+
+```{r}
+
+resumen_2 <- encuesta %>% 
+  filter(horas_trabajo > 40) %>% # Empleo pleno y adecuado
+  mutate(otras = if_else(str_detect(otras_act,"No realizó") | is.na(otras_act),0,1)) %>% 
+  group_by(sexo,area,anio) %>% 
+  summarise(ingresos_medios = survey_mean(ingrl),
+            personas = survey_total(!is.na(ingrl)),
+            prop = survey_prop(otras))
+```
+
+# Gráfico:
+
+### El gráfico del tema:
+
+```{r}
+plot_resultado <- enemdu_apilada %>% 
+  ggplot(aes(x = jornadas,y = indicador))  +
+  # Lolipop plot:
+  geom_segment(mapping = aes(x = jornadas,xend = jornadas,y = 0,yend = indicador), color="grey") +
+  geom_point(aes(color=region),size=4) +
+  geom_hline(aes(yintercept = 23,color = "OMS"),size =1.5) +
+  # Modificando las dimensiones del gráfico:
+  scale_color_manual(values = c("Región Costa" = "#d4e09b",
+                                "Región Sierra" = "#9CB380",
+                                "Región Amazónica" = "#94A89A",
+                                "Región Insular" = "#C7AC92",
+                                "OMS" = "#99C9F7")) +
+  scale_y_continuous(breaks = c(0,5,10,15,20,23,25,30),minor_breaks = NULL) +
+  facet_wrap(~region,ncol = 1) +
+  coord_flip()
+```
+
+### Añadimos el tema para que cuadre con la publicación 
+
+```{r}
+plot_resultado <- plot_resultado +
+  theme_minimal(base_size = 16) +
+  # Terminando el art attack:
+  theme(
+    legend.position = "none",
+    panel.border = element_blank(),
+    panel.grid.major.y = element_blank(),
+    strip.text.x = element_text(hjust = 0,size = 12),
+    axis.title = element_blank(),
+    plot.margin = margin(t = 0.25,r = 7.25,b = 0.25,l = 7.25, "cm"))
+```
+
+### Añadimos los titulos
+
+```{r}
+plot_resultado <- plot_resultado +
+  labs(title = "Número de doctores por cada 10.000 habitantes",
+       subtitle = "Se presenta el número de doctores de acuerdo a la duracíon o tipo de jornada en una unidad\n de salud en las diferentes regiones del Ecuador durante el año 2019.",
+       caption = "Fuente: RAS y proyecciones poblacionales INEC | Elaboración: Alex Bajaña",
+  )
+```
+
+### Guardando la imagen:
+
+Las dimensiones son para nuestra publicación, cambiar si es necesario.
+
+```{r}
+
+ggsave(plot = plot_resultado,filename = "post_ras_1.png",
+       width = 	8*4496/2400,height = 4*4496/2400) # Dimensiones fijas
+```
+
+
+
+# Citas
+
+https://www.edicionmedica.ec/secciones/profesionales/ecuador-tiene-un-promedio-de-23-44-medicos-por-cada-diez-mil-habitantes-95597
