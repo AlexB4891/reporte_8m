@@ -150,10 +150,10 @@ resumen_1 <- encuesta %>%
 resumen_2 <- encuesta %>% 
   filter(horas_trabajo > 40) %>% # Empleo pleno y adecuado
   mutate(otras = if_else(str_detect(otras_act,"No realizó") | is.na(otras_act),0,1)) %>% 
-  group_by(sexo,area,anio) %>% 
+  group_by(sexo,area,anio,otras) %>% 
   summarise(ingresos_medios = survey_mean(ingrl),
             personas = survey_total(!is.na(ingrl)),
-            prop = survey_prop(otras))
+            prop = survey_prop())
 ```
 
 # Gráfico:
