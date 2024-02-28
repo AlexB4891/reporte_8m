@@ -166,13 +166,6 @@ plot_resultado <- resumen_1 %>%
   # Lolipop plot:
   geom_segment(mapping = aes(x = 0,xend = ingresos_medios,y = anio,yend = anio), color="grey") +
   geom_point(aes(color=region),size=4) +
-  geom_hline(aes(yintercept = 23,color = "OMS"),size =1.5) +
-  # Modificando las dimensiones del gráfico:
-  scale_color_manual(values = c("Región Costa" = "#d4e09b",
-                                "Región Sierra" = "#9CB380",
-                                "Región Amazónica" = "#94A89A",
-                                "Región Insular" = "#C7AC92",
-                                "OMS" = "#99C9F7")) +
   scale_y_continuous(breaks = c(0,5,10,15,20,23,25,30),minor_breaks = NULL) +
   facet_wrap(~region,ncol = 1) +
   coord_flip()
